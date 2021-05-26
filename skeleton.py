@@ -137,9 +137,19 @@ def assignments(descriptors, clusters):
     bf = cv2.BFMatcher()
 
     matches = bf.knnMatch(descriptors, clusters, k=1)
+    # print(descriptors.shape)
+    # print(clusters.shape)
+    # print(len(matches))
+    # print(len(matches[0]))
+    # print(matches[0][0])
+    # print(matches[0][0].train_Idx)
+
     # create hard assignment
     assignment = np.zeros( (len(descriptors), len(clusters)) )
+
     # TODO
+    for idx,m in enumerate(matches) :
+        assignment[idx,m[0].trainIdx]=1
 
     return assignment
 
@@ -161,9 +171,19 @@ def vlad(files, mus, powernorm, gmp=False, gamma=1000):
             desc = cPickle.load(ff, encoding='latin1')
         a = assignments(desc, mus)
         
-        T,D = desc.shape
-        f_enc = np.zeros( (D*K), dtype=np.float32)
+        T,D = desc.shape #(6101, 64)
+        f_enc = np.zeros( (D*K), dtype=np.float32)#64*100
         for k in range(mus.shape[0]):
+            temp=a[:,k]
+            cord=np.argwhere(temp==1)
+            if len(cord)!=0:
+                cord=cord.squeeze(1)
+
+            sum=np.zeros((D))
+            for t in cord:
+                result=desc[t]-mus[k]
+                sum += result
+            f_enc[k*D:(k+1)*D]=sum
             # it's faster to select only those descriptors that have
             # this cluster as nearest neighbor and then compute the 
             # difference to the cluster center than computing the differences
@@ -173,11 +193,11 @@ def vlad(files, mus, powernorm, gmp=False, gamma=1000):
         # c) power normalization
         if powernorm:
             # TODO
+            f_enc=normalize(f_enc,norm='L2')
 
         # l2 normalization
         # TODO
-
-
+        encodings.append(f_enc)
     return encodings
 
 def esvm(encs_test, encs_train, C=1000):
@@ -225,6 +245,10 @@ def distances(encs):
     # descriptors
     # TODO
     # mask out distance with itself
+    # encs_t=[np.transpose(i) for i in encs]
+    encs=np.array(encs)
+    encs_t=np.transpose(encs)
+    dists=1-np.dot(encs,encs_t)
     np.fill_diagonal(dists, np.finfo(dists.dtype).max)
     return dists
 
@@ -235,6 +259,7 @@ def evaluate(encs, labels):
         encs: TxK*D encoding matrix
         labels: array/list of T labels
     """
+    print(len(encs))
     dist_matrix = distances(encs)
     # sort each row of the distance matrix
     indices = dist_matrix.argsort()
@@ -271,7 +296,7 @@ if __name__ == '__main__':
     print('#train: {}'.format(len(files_train)))
     if not os.path.exists('mus.pkl.gz'):
         # TODO
-        descriptors=loadRandomDescriptors(files_train,500000)
+        descriptors=loadRandomDescriptors(files_train,50000)
         print('> loaded {} descriptors:'.format(len(descriptors)))
 
         # cluster centers

@@ -10,13 +10,16 @@ X, y = make_blobs(n_samples=500, n_features=2, centers=[[-1,-1], [0,0], [1,1], [
                   random_state =9)
 y_pred = MiniBatchKMeans(n_clusters=4, batch_size=3000, random_state=9).fit(X)#K=4
 y_pred2 = y_pred.cluster_centers_
-test=np.array([[1,0],[1,1],[1,2],[1,2]])
-print(y_pred2.shape)
-print(test.shape)
+test=np.array([[3,4],[5,21]]).astype(np.float32)
+print(y_pred2[0])
+print(X[0])
 bf = cv2.BFMatcher()
-matches = bf.knnMatch(test, y_pred2, k=1)
-print(matches)
+matches = bf.knnMatch(X.astype(np.float32),y_pred2.astype(np.float32), k=1)
+# for m in matches:
+#     print(m[0].trainIdx)
+c=np.array([1,2,3,4]
+           )
+list1=[[1,2],[21,2]]
+list2=[[1,2],[21,22]]
+list3=np.dot(list2,list1)
 
-
-plt.scatter(X[:, 0], X[:, 1], c=y_pred)
-plt.show()
