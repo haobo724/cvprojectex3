@@ -18,8 +18,14 @@ matches = bf.knnMatch(X.astype(np.float32),y_pred2.astype(np.float32), k=1)
 # for m in matches:
 #     print(m[0].trainIdx)
 c=np.array([1,2,3,4]
-           )
-list1=[[1,2],[21,2]]
-list2=[[1,2],[21,22]]
-list3=np.dot(list2,list1)
+           ).reshape(-1,1)
+print(c.shape)
+c=c.ravel()
+
+print(c.shape)
+d=np.array([1,2,2,4]
+           ).reshape(-1,1)
+e=np.concatenate((c,d),axis=1)
+print(e.shape)
+print(e)
 

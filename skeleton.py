@@ -193,7 +193,9 @@ def vlad(files, mus, powernorm, gmp=False, gamma=1000):
         # c) power normalization
         if powernorm:
             # TODO
-            f_enc=normalize(f_enc,norm='L2')
+            f_enc=np.expand_dims(f_enc,axis=0)
+
+            f_enc=normalize(f_enc)
 
         # l2 normalization
         # TODO
@@ -215,20 +217,34 @@ def esvm(encs_test, encs_train, C=1000):
 
     # set up labels
     # TODO
+    encs_test=np.array(encs_test).squeeze(1)
+    encs_train=np.array(encs_train).squeeze(1)
 
+    label=np.ones((encs_train.shape[0]+1,1))
+    label[-1,0]=-1
+    label *=-1
+    label=label.ravel()
+    print(label.shape)
+    print(label)
     def loop(i):
         # compute SVM 
         # and make feature transformation
         # TODO
-        return x
+        svc = LinearSVC(C=C,class_weight='balanced')
+        test_added=encs_test[i].reshape(1,-1)
+        encs_train_new=np.concatenate((encs_train,test_added),axis=0)
+        svc.fit(encs_train_new, label)
+
+        return svc.coef_
 
     # let's do that in parallel: 
     # if that doesn't work for you, just exchange 'parmap' with 'map'
     # Even better: use DASK arrays instead, then everything should be
     # parallelized
-    new_encs = list(parmap( loop, tqdmp(range(len(encs_test)))))
+    new_encs = list(map( loop, tqdm(range(len(encs_test)))))
     new_encs = np.concatenate(new_encs, axis=0)
     # return new encodings
+
     return new_encs
 
 
@@ -246,7 +262,13 @@ def distances(encs):
     # TODO
     # mask out distance with itself
     # encs_t=[np.transpose(i) for i in encs]
-    encs=np.array(encs)
+    if len(np.array(encs).shape)==3:
+        encs=np.array(encs).squeeze(1)
+        print("[INFO] Squeezed")
+    else:
+        encs=np.array(encs)
+        print("[INFO] Did not Squeezed")
+
     encs_t=np.transpose(encs)
     dists=1-np.dot(encs,encs_t)
     np.fill_diagonal(dists, np.finfo(dists.dtype).max)
@@ -259,7 +281,6 @@ def evaluate(encs, labels):
         encs: TxK*D encoding matrix
         labels: array/list of T labels
     """
-    print(len(encs))
     dist_matrix = distances(encs)
     # sort each row of the distance matrix
     indices = dist_matrix.argsort()
@@ -289,7 +310,7 @@ if __name__ == '__main__':
     parser = parseArgs(parser)
     args = parser.parse_args()
     np.random.seed(42) # fix random seed
-   
+    print(args.powernorm)
     # a) dictionary
     files_train, labels_train = getFiles(args.in_train, args.suffix,
                                          args.labels_train)
@@ -318,7 +339,7 @@ if __name__ == '__main__':
     fname = 'enc_test_gmp{}.pkl.gz'.format(args.gamma) if args.gmp else 'enc_test.pkl.gz'
     if not os.path.exists(fname) or args.overwrite:
         # TODO
-        enc_test=vlad(files_train, mus, powernorm=args.powernorm, gmp=args.gmp, gamma=args.gamma)
+        enc_test=vlad(files_test, mus, powernorm=args.powernorm, gmp=args.gmp, gamma=args.gamma)
         with gzip.open(fname, 'wb') as fOut:
             cPickle.dump(enc_test, fOut, -1)
     else:
@@ -334,6 +355,7 @@ if __name__ == '__main__':
     fname = 'enc_train_gmp{}.pkl.gz'.format(args.gamma) if args.gmp else 'enc_train.pkl.gz'
     if not os.path.exists(fname) or args.overwrite:
         # TODO
+        enc_train=vlad(files_train, mus, powernorm=args.powernorm, gmp=args.gmp, gamma=args.gamma)
         with gzip.open(fname, 'wb') as fOut:
             cPickle.dump(enc_train, fOut, -1)
     else:
@@ -342,6 +364,15 @@ if __name__ == '__main__':
 
     print('> esvm computation')
     # TODO
+    fname = 'enc_test_new_gmp{}.pkl.gz'.format(args.gamma) if args.gmp else 'enc_test_new.pkl.gz'
+    if not os.path.exists(fname) or args.overwrite:
+        # TODO
+        enc_test = esvm(enc_test, enc_train, C=1000)
+        with gzip.open(fname, 'wb') as fOut:
+            cPickle.dump(enc_test, fOut, -1)
+    else:
+        with gzip.open(fname, 'rb') as f:
+            enc_test = cPickle.load(f)
 
     # eval
     evaluate(enc_test, labels_test)
